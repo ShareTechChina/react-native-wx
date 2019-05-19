@@ -30,6 +30,6 @@
     "bluebird": "^3.0.0"
   },
   "peerDependencies": {
-    "react-native": "^0.33.0"
+    "react-native": "^0.59.8"
   }
 }
