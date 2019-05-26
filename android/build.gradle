@@ -16,7 +16,7 @@ android {
 
 dependencies {
   implementation 'com.facebook.react:react-native:+'
-  implementation files('libs/libammsdk.jar')
+  api files('libs/libammsdk.jar')
 }
 
 //buildscript {
