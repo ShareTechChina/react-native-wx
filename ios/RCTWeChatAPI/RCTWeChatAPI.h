@@ -14,4 +14,6 @@
 
 @interface RCTWeChatAPI : NSObject <RCTBridgeModule>
 
++ (RCTWeChatAPI *)sharedInstance;
+
 @end

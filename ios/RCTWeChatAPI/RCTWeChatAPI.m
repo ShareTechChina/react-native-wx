@@ -7,6 +7,7 @@
 //
 
 #import "RCTWeChatAPI.h"
+#import "Event.h"
 
 #if __has_include(<React/RCTBridge.h>)
 #import <React/RCTLog.h>
@@ -18,6 +19,7 @@
 #import "RCTEventDispatcher.h"
 #import "RCTBridge.h"
 #import "RCTImageLoader.h"
+
 #endif
 
 #import "WXApi.h"
@@ -48,6 +50,18 @@ static BOOL gIsAppRegistered = false;
 
 @implementation RCTWeChatAPI
 
+static RCTWeChatAPI *wechatUtil = nil;
+
++ (RCTWeChatAPI *)sharedInstance {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        if (wechatUtil == nil) {
+            wechatUtil = [[RCTWeChatAPI alloc] init];
+        }
+    });
+    return wechatUtil;
+}
+
 @synthesize bridge = _bridge;
 
 RCT_EXPORT_MODULE()
@@ -60,6 +74,11 @@ RCT_EXPORT_MODULE()
 - (dispatch_queue_t)methodQueue
 {
     return dispatch_get_main_queue();
+}
+
++ (BOOL)requiresMainQueueSetup
+{
+    return YES;
 }
 
 - (instancetype)init
@@ -94,8 +113,9 @@ RCT_EXPORT_METHOD(login:(NSDictionary *)config
     SendAuthReq* req = [[SendAuthReq alloc] init];
     req.scope = config[@"scope"];
     req.state = config[@"state"]?:[NSDate date].description;
-    BOOL success = [WXApi sendReq:req];
-    callback(@[success ? [NSNull null] : INVOKE_FAILED]);
+    [WXApi sendReq:req completion:^(BOOL success) {
+        callback(@[success ? [NSNull null] : INVOKE_FAILED]);
+    }];
 }
 
 RCT_EXPORT_METHOD(shareToTimeline:(NSDictionary *)data
@@ -110,19 +130,19 @@ RCT_EXPORT_METHOD(shareToSession:(NSDictionary *)data
     [self shareToWeixinWithData:data scene:WXSceneSession callback:callback];
 }
 
-RCT_EXPORT_METHOD(pay:(NSDictionary *)data
-                  :(RCTResponseSenderBlock)callback)
-{
-    PayReq* req             = [PayReq new];
-    req.partnerId           = data[@"partnerId"];
-    req.prepayId            = data[@"prepayId"];
-    req.nonceStr            = data[@"nonceStr"];
-    req.timeStamp           = [data[@"timeStamp"] unsignedIntValue];
-    req.package             = data[@"package"];
-    req.sign                = data[@"sign"];
-    BOOL success = [WXApi sendReq:req];
-    callback(@[success ? [NSNull null] : INVOKE_FAILED]);
-}
+//RCT_EXPORT_METHOD(pay:(NSDictionary *)data
+//                  :(RCTResponseSenderBlock)callback)
+//{
+//    PayReq* req             = [PayReq new];
+//    req.partnerId           = data[@"partnerId"];
+//    req.prepayId            = data[@"prepayId"];
+//    req.nonceStr            = data[@"nonceStr"];
+//    req.timeStamp           = [data[@"timeStamp"] unsignedIntValue];
+//    req.package             = data[@"package"];
+//    req.sign                = data[@"sign"];
+//    BOOL success = [WXApi sendReq:req];
+//    callback(@[success ? [NSNull null] : INVOKE_FAILED]);
+//}
 
 - (void)handleOpenURL:(NSNotification *)note
 {
@@ -193,11 +213,13 @@ RCT_EXPORT_METHOD(pay:(NSDictionary *)data
         req.message = mediaMessage;
     }
     
-    BOOL success = [WXApi sendReq:req];
-    if (success == NO)
-    {
-        callback(@[INVOKE_FAILED]);
-    }
+    [WXApi sendReq:req completion:^(BOOL success) {
+        if (success == NO)
+        {
+            callback(@[INVOKE_FAILED]);
+        }
+    }];
+    
 }
 
 
@@ -213,7 +235,7 @@ RCT_EXPORT_METHOD(pay:(NSDictionary *)data
             }
             size = CGSizeMake(thumbImageSize,thumbImageSize);
         }
-        [_bridge.imageLoader loadImageWithURLRequest:[RCTConvert NSURLRequest:imageUrl] size:size scale:1 clipped:FALSE resizeMode:UIViewContentModeScaleToFill progressBlock:nil partialLoadBlock: nil completionBlock:^(NSError *error, UIImage *image) {
+        [_bridge.imageLoader loadImageWithURLRequest:[RCTConvert NSURLRequest:imageUrl] size:size scale:1 clipped:TRUE resizeMode:UIViewContentModeScaleToFill progressBlock:nil partialLoadBlock: nil completionBlock:^(NSError *error, UIImage *image) {
             [self shareToWeixinWithData:aData image:image scene:aScene callBack:aCallBack];
         }];
     }
@@ -240,7 +262,9 @@ RCT_EXPORT_METHOD(pay:(NSDictionary *)data
             }
         }
     }
-    gIsAppRegistered = [WXApi registerApp:gAppID];
+    gIsAppRegistered = [WXApi registerApp:gAppID universalLink:@"https://restapi.share68.com/"];
+    NSArray *list1 = [[[NSBundle mainBundle] infoDictionary] valueForKey:@"CFBundleURLTypes"];
+
 }
 
 
@@ -297,14 +321,16 @@ RCT_EXPORT_METHOD(pay:(NSDictionary *)data
         body[@"appid"] = gAppID;
         body[@"code"]= r.code;
     }
-    else if([resp isKindOfClass:[PayResp class]]) {
-        PayResp *r = (PayResp *)resp;
-        body[@"appid"] = gAppID;
-        body[@"returnKey"] = r.returnKey;
-        body[@"type"]= @"Pay.Resp";
-    }
+//    else if([resp isKindOfClass:[PayResp class]]) {
+//        PayResp *r = (PayResp *)resp;
+//        body[@"appid"] = gAppID;
+//        body[@"returnKey"] = r.returnKey;
+//        body[@"type"]= @"Pay.Resp";
+//    }
     
-    [self.bridge.eventDispatcher sendAppEventWithName:@"WeChat_Resp" body:body];
+//    [self.bridge.eventDispatcher sendDeviceEventWithName:@"WeChat_Resp" body:body];
+    Event *event = [Event allocWithZone: nil];
+    [event wechatAuth: body];
 }
 
 @end
