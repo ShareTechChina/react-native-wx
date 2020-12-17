@@ -66,6 +66,12 @@ static RCTWeChatAPI *wechatUtil = nil;
 
 RCT_EXPORT_MODULE()
 
+/*implement 'requiresMainQueueSetup' if overrides'constantsToExport' */
++ (BOOL) requiresMainQueueSetup
+{
+    return YES;
+}
+
 - (NSDictionary *)constantsToExport
 {
     return @{ @"isAppRegistered":@(gIsAppRegistered)};
